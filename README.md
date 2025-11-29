@@ -30,6 +30,8 @@ Reuse your original session, if still running, with `screen -r speedrun`, or sta
 `python -m scripts.push_to_hf` uploads base/mid/sft checkpoints directly from `$NANOCHAT_BASE_DIR`:
 
 ```bash
+source .venv/bin/activate
+export NANOCHAT_BASE_DIR="$HOME/.cache/nanochat"
 # Base/Mid/SFT checkpoints into subfolders of one repo
 python -m scripts.push_to_hf --stage base --repo-id Trelis/nanochat --path-in-repo base/d20
 python -m scripts.push_to_hf --stage mid  --repo-id Trelis/nanochat --path-in-repo mid/d20
@@ -54,6 +56,7 @@ source .venv/bin/activate
 # Example: grab SFT d20 into the local cache
 python -m scripts.pull_from_hf --repo-id Trelis/nanochat \
   --repo-path sft/d20 --stage sft --target-tag d20
+
 # Tokenizer / report assets
 export NANOCHAT_BASE_DIR="$HOME/.cache/nanochat"
 python -m scripts.pull_from_hf --repo-id Trelis/nanochat \
@@ -66,9 +69,11 @@ Downloads land in `$NANOCHAT_BASE_DIR/{base,mid,chatsft}` (or the `--dest-dir` y
 ### Running the chat interface (after training OR downloading checkpoints)
 When you're done with training and pushing to hub (or you have just downloaded checkpoints), port 8000 is exposed on the runpod template, so you can run:
 ```bash
+source .venv/bin/activate
+export NANOCHAT_BASE_DIR="$HOME/.cache/nanochat"
 python -m scripts.chat_web
 ```
-and then access it via `https://<pod-id>-8000.proxy.runpod.net`.
+and then access it via `https://21kgtegp93ibt7-8000.proxy.runpod.net`.
 
 ## About NanoChat
 This repo is a full-stack implementation of an LLM like ChatGPT in a single, clean, minimal, hackable, dependency-lite codebase. nanochat is designed to run on a single 8XH100 node via scripts like [speedrun.sh](speedrun.sh), that run the entire pipeline start to end. This includes tokenization, pretraining, finetuning, evaluation, inference, and web serving over a simple UI so that you can talk to your own LLM just like ChatGPT. nanochat will become the capstone project of the course LLM101n being developed by Eureka Labs.
