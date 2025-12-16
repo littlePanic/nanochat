@@ -34,8 +34,9 @@ The `recursive` branch implements a recursive transformer architecture where the
 **Run the full pipeline:**
 ```bash
 cd ~/nanochat
+git switch recursive
 apt-get update && apt-get install -y screen
-export WANDB_RUN=recursive
+export WANDB_RUN=recursive-d20
 screen -L -Logfile speedrun_recursive.log -S speedrun bash speedrun_recursive.sh
 ```
 
