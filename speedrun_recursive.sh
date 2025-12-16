@@ -99,8 +99,10 @@ fi
 # The recursive model uses 8 unique layer weights (2 prelude + 4 recur + 2 coda).
 # With train_recur_mean=4, effective depth = 2 + 4*4 + 2 = 20 layers per forward pass.
 # Training samples r from Poisson log-normal distribution around mean=4.
-# Chinchilla says #tokens = 20X #params, so we need ~11.2B tokens for 561M params.
-# At 250M chars/shard and 4.8 chars/token, this is ~216 shards. Round up to 240.
+# Recursive has ~225M params (vs 561M for d20) due to weight sharing.
+# We use 40x data:param ratio (vs Chinchilla's 20x) since fewer params but same effective depth.
+# 40 * 225M = 9B tokens. At 4.8 chars/token = 43B chars. At 250M chars/shard = 172 shards.
+# We download 240 shards (same as d20) which gives plenty of headroom.
 echo "Waiting for dataset download to complete..."
 wait $DATASET_DOWNLOAD_PID
 

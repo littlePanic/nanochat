@@ -232,11 +232,37 @@ class GPT(nn.Module):
 
     def estimate_flops(self):
         """ Return the estimated FLOPs per token for the model. Ref: https://arxiv.org/abs/2204.02311 """
-        nparams = sum(p.numel() for p in self.parameters())
-        nparams_embedding = self.transformer.wte.weight.numel()
-        l, h, q, t = self.config.n_layer, self.config.n_head, self.config.n_embd // self.config.n_head, self.config.sequence_len
-        num_flops_per_token = 6 * (nparams - nparams_embedding) + 12 * l * h * q * t
-        return num_flops_per_token
+        h, q, t = self.config.n_head, self.config.n_embd // self.config.n_head, self.config.sequence_len
+
+        if self.config.n_recur_block > 0:
+            # Recursive model: account for parameter reuse
+            # inject and recur params are used r times per forward pass
+            r = int(self.config.train_recur_mean)
+
+            # Params used once per forward
+            prelude_params = sum(p.numel() for p in self.transformer.prelude.parameters())
+            coda_params = sum(p.numel() for p in self.transformer.coda.parameters())
+            lm_head_params = self.lm_head.weight.numel()
+            once_params = prelude_params + coda_params + lm_head_params
+
+            # Params used r times per forward (inside recurrence loop)
+            inject_params = self.inject.weight.numel()
+            recur_params = sum(p.numel() for p in self.transformer.recur.parameters())
+            r_times_params = inject_params + recur_params
+
+            flops_from_params = 6 * (once_params + r * r_times_params)
+
+            # Effective depth for attention flops
+            effective_layers = self.config.n_prelude + self.config.n_recur_block * r + self.config.n_coda
+            flops_from_attention = 12 * effective_layers * h * q * t
+
+            return flops_from_params + flops_from_attention
+        else:
+            # Standard model: original formula
+            nparams = sum(p.numel() for p in self.parameters())
+            nparams_embedding = self.transformer.wte.weight.numel()
+            num_flops_per_token = 6 * (nparams - nparams_embedding) + 12 * self.config.n_layer * h * q * t
+            return num_flops_per_token
 
     def setup_optimizers(self, unembedding_lr=0.004, embedding_lr=0.2, matrix_lr=0.02, weight_decay=0.0):
         model_dim = self.config.n_embd
