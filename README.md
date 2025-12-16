@@ -63,7 +63,7 @@ Reuse your original session, if still running, with `screen -r speedrun`, or sta
 ```bash
 source .venv/bin/activate
 export NANOCHAT_BASE_DIR="$HOME/.cache/nanochat"
-export REPO_ID="Trelis/nanochat"
+export REPO_ID="Trelis/nanochat-recursive"
 
 # Base/Mid/SFT checkpoints into subfolders of one repo
 python -m scripts.push_to_hf --stage base --repo-id $REPO_ID --path-in-repo base/d20

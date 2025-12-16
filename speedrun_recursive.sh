@@ -99,10 +99,10 @@ fi
 # The recursive model uses 8 unique layer weights (2 prelude + 4 recur + 2 coda).
 # With train_recur_mean=4, effective depth = 2 + 4*4 + 2 = 20 layers per forward pass.
 # Training samples r from Poisson log-normal distribution around mean=4.
-# Recursive has ~225M params (vs 561M for d20) due to weight sharing.
-# We use 40x data:param ratio (vs Chinchilla's 20x) since fewer params but same effective depth.
-# 40 * 225M = 9B tokens. At 4.8 chars/token = 43B chars. At 250M chars/shard = 172 shards.
-# We download 240 shards (same as d20) which gives plenty of headroom.
+# Recursive has ~328M params (vs 561M for d20). Same model_dim=1280, but 8 unique layers.
+# We use 34x data:param ratio to match d20's total training tokens (compute-matched).
+# 34 * 328M = 11.2B tokens. At 4.8 chars/token = 53B chars. At 250M chars/shard = 212 shards.
+# We download 240 shards (same as d20) which gives headroom.
 echo "Waiting for dataset download to complete..."
 wait $DATASET_DOWNLOAD_PID
 
@@ -110,8 +110,8 @@ wait $DATASET_DOWNLOAD_PID
 NPROC_PER_NODE=8
 
 # pretrain the recursive model (recursive config is the default on this branch)
-# Use 40x data:param ratio (vs default 20x) since recursive has fewer params but same effective depth
-torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_train -- --target_param_data_ratio=40 --run=$WANDB_RUN
+# Use 34x data:param ratio to match d20's total training tokens (compute-matched comparison)
+torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_train -- --target_param_data_ratio=34 --run=$WANDB_RUN
 # evaluate the model on a larger chunk of train/val data and draw some samples
 torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_loss
 # evaluate the model on CORE tasks with MULTIPLE recursion counts
