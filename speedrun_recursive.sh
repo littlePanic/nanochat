@@ -101,7 +101,8 @@ wait $DATASET_DOWNLOAD_PID
 NPROC_PER_NODE=8
 
 # pretrain the recursive model (recursive config is the default on this branch)
-torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_train -- --run=$WANDB_RUN
+# Use 40x data:param ratio (vs default 20x) since recursive has fewer params but same effective depth
+torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_train -- --target_param_data_ratio=40 --run=$WANDB_RUN
 # evaluate the model on a larger chunk of train/val data and draw some samples
 torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_loss
 # evaluate the model on CORE tasks with MULTIPLE recursion counts
