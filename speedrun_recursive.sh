@@ -81,10 +81,17 @@ python -m nanochat.dataset -n 8
 # See comment below for why 240 is the right number here
 python -m nanochat.dataset -n 240 &
 DATASET_DOWNLOAD_PID=$!
-# train the tokenizer with vocab size 2**16 = 65536 on ~2B characters of data
-python -m scripts.tok_train --max_chars=2000000000
-# evaluate the tokenizer (report compression ratio etc.)
-python -m scripts.tok_eval
+
+# Train tokenizer only if not already trained
+TOKENIZER_DIR="$NANOCHAT_BASE_DIR/tokenizer"
+if [ -d "$TOKENIZER_DIR" ] && [ -f "$TOKENIZER_DIR/tokenizer.json" ]; then
+    echo "Tokenizer already exists at $TOKENIZER_DIR, skipping training..."
+else
+    # train the tokenizer with vocab size 2**16 = 65536 on ~2B characters of data
+    python -m scripts.tok_train --max_chars=2000000000
+    # evaluate the tokenizer (report compression ratio etc.)
+    python -m scripts.tok_eval
+fi
 
 # -----------------------------------------------------------------------------
 # Base model (pretraining) - RECURSIVE TRANSFORMER
