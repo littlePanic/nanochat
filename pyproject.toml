@@ -11,6 +11,7 @@ dependencies = [
     "hf-transfer>=0.1.9",
     "psutil>=7.1.0",
     "regex>=2025.9.1",
+    "requests>=2.32.5",
     "setuptools>=80.9.0",
     "tiktoken>=0.11.0",
     "tokenizers>=0.22.0",

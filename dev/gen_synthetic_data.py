@@ -344,7 +344,7 @@ def generate_conversation(idx: int):
 
 # Configuration
 num_conversations = 1000
-num_workers = 4
+num_workers = 64
 
 output_file = os.path.join(get_base_dir(), "identity_conversations.jsonl")
 # Wipe the file clean first to reset it
