@@ -10,6 +10,8 @@ To get started with a runpod one-click template (affiliate), click [here](https:
 The Runpod template injects the following variables, which you'll want to set via secrets:
 ![Runpod Template environment variables](runpod_template_injected_env_variables.png)
 
+> Currently, there is an access issue downloading data for the model's personality. This means it needs to be generated from scratch, requiring an OpenRouter key (just they key, no keyname=) to be placed in openroutertoken.txt in root.
+
 Once ssh'd in, you can install `screen` and start the whole run:
 ```bash
 cd ~/nanochat
