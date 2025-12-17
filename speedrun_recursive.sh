@@ -128,8 +128,8 @@ torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_eval -- -
 IDENTITY_FILE="$NANOCHAT_BASE_DIR/identity_conversations.jsonl"
 if [ -f "$IDENTITY_FILE" ]; then
     echo "identity_conversations.jsonl already exists, skipping download..."
-elif ! curl -fL -o "$IDENTITY_FILE" https://karpathy-public.s3.us-west-2.amazonaws.com/identity_conversations.jsonl; then
-    echo "Download failed, generating identity_conversations.jsonl locally..."
+elif ! curl -fL -o "$IDENTITY_FILE" https://raw.githubusercontent.com/TrelisResearch/nanochat/master/identity_conversations.jsonl; then
+    echo "Download failed, generating identity_conversations.jsonl locally... Make sure you have added an OpenRouter API Key to openroutertoken.txt"
     PYTHONPATH=$(pwd) python dev/gen_synthetic_data.py
 fi
 
