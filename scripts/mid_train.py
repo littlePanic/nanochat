@@ -12,9 +12,11 @@ torchrun --standalone --nproc_per_node=8 -m scripts.mid_train -- --device_batch_
 from collections import deque
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+import math
 import time
 import wandb
 import torch
+import numpy as np
 from contextlib import nullcontext
 from nanochat.common import compute_init, compute_cleanup, print0, DummyWandb, get_base_dir, autodetect_device_type
 from nanochat.tokenizer import get_token_bytes
@@ -240,8 +242,16 @@ while True:
     synchronize()
     t0 = time.time()
     for micro_step in range(grad_accum_steps):
+        # Sample number of recurrences from Poisson log-normal distribution for recursive models
+        num_recur = None
+        if orig_model.config.n_recur_block > 0:
+            sigma = 0.5
+            r_bar = orig_model.config.train_recur_mean
+            tau = np.random.normal(math.log(r_bar) - 0.5 * sigma**2, sigma)
+            num_recur = np.random.poisson(math.exp(tau)) + 1
+            num_recur = max(1, min(num_recur, orig_model.config.train_recur_max))
         with autocast_ctx:
-            loss = model(x, y)
+            loss = model(x, y, num_recur=num_recur)
         train_loss = loss.detach() # for logging
         loss = loss / grad_accum_steps # each .backward() is a grad sum => normalize loss here
         loss.backward()

@@ -12,9 +12,11 @@ torchrun --standalone --nproc_per_node=8 -m scripts.chat_sft
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
+import math
 import wandb
 import torch
 import torch.distributed as dist
+import numpy as np
 from contextlib import nullcontext
 
 from nanochat.common import compute_init, compute_cleanup, get_base_dir, print0, DummyWandb, autodetect_device_type
@@ -215,8 +217,16 @@ for step in range(num_iterations):
     num_tokens = torch.tensor(0, device=device) # the number of "active" tokens of supervision seen
     for micro_step in range(grad_accum_steps):
         train_inputs, train_targets = next(train_iter)
+        # Sample number of recurrences from Poisson log-normal distribution for recursive models
+        num_recur = None
+        if orig_model.config.n_recur_block > 0:
+            sigma = 0.5
+            r_bar = orig_model.config.train_recur_mean
+            tau = np.random.normal(math.log(r_bar) - 0.5 * sigma**2, sigma)
+            num_recur = np.random.poisson(math.exp(tau)) + 1
+            num_recur = max(1, min(num_recur, orig_model.config.train_recur_max))
         with autocast_ctx:
-            loss = model(train_inputs, train_targets)
+            loss = model(train_inputs, train_targets, num_recur=num_recur)
         train_loss = loss.detach() # for logging
         loss = loss / grad_accum_steps # each .backward() is a grad sum => normalize loss here
         loss.backward() # accumulate the gradient

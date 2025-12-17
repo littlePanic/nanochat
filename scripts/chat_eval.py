@@ -28,7 +28,7 @@ from tasks.spellingbee import SpellingBee
 # -----------------------------------------------------------------------------
 # Generative evaluation loop (we go one problem at a time, sample, evaluate)
 
-def run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_new_tokens, temperature, top_k, max_problems=None):
+def run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_new_tokens, temperature, top_k, max_problems=None, num_recur=None):
 
     ddp, ddp_rank, ddp_local_rank, ddp_world_size = get_dist_info()
     device = model.get_device()
@@ -49,6 +49,7 @@ def run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_
             max_tokens=max_new_tokens,
             temperature=temperature,
             top_k=top_k,
+            num_recur=num_recur,
         )
         # Decode the completions as text
         prefix_length = len(encoded_prompt)
@@ -87,7 +88,7 @@ def run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_
 # A lot easier because we don't have to sample. Therefore, we can actually go
 # batches at a time and just check the logits for correct answer choices.
 
-def run_categorical_eval(task_object, tokenizer, model, batch_size, max_problems=None):
+def run_categorical_eval(task_object, tokenizer, model, batch_size, max_problems=None, num_recur=None):
 
     ddp, ddp_rank, ddp_local_rank, ddp_world_size = get_dist_info()
     device = model.get_device()
@@ -114,7 +115,7 @@ def run_categorical_eval(task_object, tokenizer, model, batch_size, max_problems
 
         # Get the logits for the whole batch of conversations in parallel (efficiency win here)
         with torch.no_grad():
-            logits = model(prompt_ids) # (B, T, V)
+            logits, _ = model(prompt_ids, num_recur=num_recur) # (B, T, V)
 
         # Focus on the available answer on just the letters corresponding to choices
         # Note that this helps the evaluation a lot because it specifically narrows the focus to only the available letters
@@ -158,7 +159,7 @@ def run_categorical_eval(task_object, tokenizer, model, batch_size, max_problems
 
 def run_chat_eval(task_name, model, tokenizer, engine,
                    batch_size=1, num_samples=1, max_new_tokens=512, temperature=0.0, top_k=50,
-                   max_problems=None):
+                   max_problems=None, num_recur=None):
     # Create the evaluation object
     task_module = {
         'HumanEval': HumanEval,
@@ -171,9 +172,9 @@ def run_chat_eval(task_name, model, tokenizer, engine,
     task_object = task_module()
     # Run the evaluation
     if task_object.eval_type == 'generative':
-        acc = run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_new_tokens, temperature, top_k, max_problems=max_problems)
+        acc = run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_new_tokens, temperature, top_k, max_problems=max_problems, num_recur=num_recur)
     elif task_object.eval_type == 'categorical':
-        acc = run_categorical_eval(task_object, tokenizer, model, batch_size, max_problems=max_problems)
+        acc = run_categorical_eval(task_object, tokenizer, model, batch_size, max_problems=max_problems, num_recur=num_recur)
     else:
         raise ValueError(f"Unsupported task evaluation type: {task_object.eval_type}")
     return acc
@@ -195,7 +196,14 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--step', type=int, default=None, help='Step to load')
     parser.add_argument('-x', '--max-problems', type=int, default=None, help='Max problems to evaluate')
     parser.add_argument('--device-type', type=str, default='', choices=['cuda', 'cpu', 'mps'], help='Device type for evaluation: cuda|cpu|mps. empty => autodetect')
+    parser.add_argument('--num-recur', type=str, default=None,
+                        help='Number of recurrences for recursive transformer. Can be single value (e.g. "4") or comma-separated list (e.g. "2,4,8,16") to evaluate multiple.')
     args = parser.parse_args()
+
+    # Parse num_recur argument - can be single value or comma-separated list
+    recur_values = [None]  # default: use model's default
+    if args.num_recur is not None:
+        recur_values = [int(x.strip()) for x in args.num_recur.split(',')]
 
     device_type = autodetect_device_type() if args.device_type == "" else args.device_type
     ddp, ddp_rank, ddp_local_rank, ddp_world_size, device = compute_init(device_type)
@@ -217,41 +225,55 @@ if __name__ == "__main__":
     }
     task_names = all_tasks if args.task_name is None else args.task_name.split('|')
 
-    # Run all the task evaluations sequentially
-    results = {}
-    for task_name in task_names:
-        with autocast_ctx:
-            acc = run_chat_eval(
-                task_name,
-                model, tokenizer, engine,
-                batch_size=args.batch_size,
-                num_samples=args.num_samples,
-                max_new_tokens=args.max_new_tokens,
-                temperature=args.temperature,
-                top_k=args.top_k,
-                max_problems=args.max_problems,
-            )
-            results[task_name] = acc
-            print0(f"{task_name} accuracy: {100 * acc:.2f}%")
-
-    # Log to report
+    # Run all the task evaluations for each num_recur value
     from nanochat.report import get_report
-    all_tasks_were_evaluated = all(task_name in results for task_name in all_tasks)
-    # calculate the ChatCORE metric if we can (similar to CORE, it's the mean centered accuracy)
-    # this way, ChatCORE ranges from 0 (at random baseline) to 1 (peak performance)
-    chatcore_metric_dict = {}
-    if all_tasks_were_evaluated:
-        centered_mean = 0
-        for task_name, acc in results.items():
-            baseline_acc = baseline_accuracies.get(task_name, 0.0)
-            centered_acc = (acc - baseline_acc) / (1.0 - baseline_acc)
-            centered_mean += centered_acc
-        chatcore_metric = centered_mean / len(results)
-        chatcore_metric_dict = {"ChatCORE metric": chatcore_metric}
-    get_report().log(section="Chat evaluation " + args.source, data=[
-        vars(args), # CLI args
-        results,
-        chatcore_metric_dict,
-    ])
+    all_results = {}
+    for num_recur in recur_values:
+        recur_label = f"r{num_recur}" if num_recur is not None else "default"
+        print0(f"\n{'='*80}")
+        print0(f"Evaluating with num_recur={num_recur if num_recur is not None else 'default'}")
+        print0(f"{'='*80}")
+
+        results = {}
+        for task_name in task_names:
+            with autocast_ctx:
+                acc = run_chat_eval(
+                    task_name,
+                    model, tokenizer, engine,
+                    batch_size=args.batch_size,
+                    num_samples=args.num_samples,
+                    max_new_tokens=args.max_new_tokens,
+                    temperature=args.temperature,
+                    top_k=args.top_k,
+                    max_problems=args.max_problems,
+                    num_recur=num_recur,
+                )
+                results[task_name] = acc
+                print0(f"{task_name} accuracy: {100 * acc:.2f}%")
+
+        all_results[recur_label] = results
+
+        # calculate the ChatCORE metric if we can (similar to CORE, it's the mean centered accuracy)
+        # this way, ChatCORE ranges from 0 (at random baseline) to 1 (peak performance)
+        all_tasks_were_evaluated = all(task_name in results for task_name in all_tasks)
+        chatcore_metric_dict = {}
+        if all_tasks_were_evaluated:
+            centered_mean = 0
+            for task_name, acc in results.items():
+                baseline_acc = baseline_accuracies.get(task_name, 0.0)
+                centered_acc = (acc - baseline_acc) / (1.0 - baseline_acc)
+                centered_mean += centered_acc
+            chatcore_metric = centered_mean / len(results)
+            chatcore_metric_dict = {"ChatCORE metric": chatcore_metric}
+            print0(f"ChatCORE metric ({recur_label}): {chatcore_metric:.4f}")
+
+        # Log to report for this recur value
+        section_name = f"Chat evaluation {args.source}" + (f" (r={num_recur})" if num_recur is not None else "")
+        get_report().log(section=section_name, data=[
+            vars(args),
+            {"num_recur": num_recur},
+            results,
+            chatcore_metric_dict,
+        ])
 
     compute_cleanup()
