@@ -134,7 +134,8 @@ elif ! curl -fL -o "$IDENTITY_FILE" https://karpathy-public.s3.us-west-2.amazona
 fi
 
 # run midtraining (with Poisson sampling) and eval the model with multiple recursion counts
-torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.mid_train -- --run=$WANDB_RUN
+# Note: --device_batch_size=16 needed since torch.compile is disabled for mid_train
+torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.mid_train -- --device_batch_size=16 --run=$WANDB_RUN
 torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.chat_eval -- -i mid --num-recur=2,4,8,16
 
 # -----------------------------------------------------------------------------
