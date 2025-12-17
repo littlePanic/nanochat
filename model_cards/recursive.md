@@ -41,3 +41,7 @@ About Recursive NanoChat:
 ![ChatCORE vs Recursions](chatcore_vs_recursions.png)
 
 *The recursive model (8 unique layers, ~328M params) approaches d20 performance (20 unique layers, ~561M params) as test-time recurrences increase. At r=4 (iso-flops), the recursive model achieves 94% of d20's ChatCORE with 42% fewer parameters.*
+
+![GSM8K vs Recursions](gsm8k_vs_recursions.png)
+
+*On GSM8K (math reasoning), the recursive model surpasses d20 at r>=4, suggesting that iterative refinement through recurrence may particularly benefit reasoning tasks.*
