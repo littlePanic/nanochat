@@ -11,10 +11,12 @@ dependencies = [
     "hf-transfer>=0.1.9",
     "psutil>=7.1.0",
     "regex>=2025.9.1",
+    "ruff>=0.14.10",
     "setuptools>=80.9.0",
     "tiktoken>=0.11.0",
     "tokenizers>=0.22.0",
     "torch>=2.8.0",
+    "ty>=0.0.5",
     "uvicorn>=0.36.0",
     "wandb>=0.21.3",
 ]
@@ -67,7 +69,7 @@ cpu = [
 ]  
 gpu = [  
     "torch>=2.8.0",
-    "triton>=3.4.0; sys_platform == 'linux'",
+    "triton>=3.4.0",
     "jvp-flash-attention>=0.10.0",
 ]  
   
