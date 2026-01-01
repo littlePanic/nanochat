@@ -68,6 +68,14 @@ cpu = [
 gpu = [  
     "torch>=2.8.0",  
 ]  
+analysis = [
+    "jupyterlab",
+    "ipykernel",
+    "matplotlib",
+    "seaborn",
+    "pandas",
+    "scikit-learn",
+]
   
 [tool.uv]  
 conflicts = [  
