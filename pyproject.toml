@@ -75,6 +75,9 @@ analysis = [
     "seaborn",
     "pandas",
     "scikit-learn",
+    "faiss-cpu",
+    "scipy",
+    "hdbscan",
 ]
   
 [tool.uv]  
